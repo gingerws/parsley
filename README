@@ -1,0 +1,115 @@
+  parsley: Parsley Manual
+-------------------------
+
+
+License
+       parsley is written by Josef Hahn under the terms of the GPLv3.
+
+       Please read the LICENSE file from the package and the Dependencies section for included third-
+       party stuff.
+
+About
+       Parsley keeps a configured set of places in file systems in sync on a regular basis.
+
+       Those file systems can live on remote machines and become mounted by means of sshfs at runtime
+       automatically.
+
+       Features:
+
+       · Keeps local and ssh file systems in sync
+
+       · Has a mechanism for metadata synchronization (tags, rating, ...)
+
+       · Robust infrastructure with working retry and error handling
+
+       · Alternative modes
+
+	 · move to sink mode: always moves all files from the source to a sink and so keep the source
+	   empty.
+
+       · Flexible and extensible api
+
+       Are you currently reading from another source than the homepage? Are you in doubt if that
+       place is up-to-date? If yes, you should visit https://ginger.ws/wiki/pino/projs/parsley and
+       check that. You are currently reading the manual for version 1.0.420.
+
+Maturity
+       In this version, the state of parsley is considered as production-stable.
+
+Dependencies
+	There are external parts which are used by parsley. Many thanks to the projects and all
+       participants.
+
+	Python 3.4 required
+
+	python-tk recommended (maybe has alternatives)
+
+	Typical Linux Desktop recommended (maybe has alternatives)
+
+	sshfs optional
+
+	python3-pyxattr optional
+
+	banner image included : _meta/homepage_bannerimage.png; license CC BY-SA 3.0; copied from
+       here.
+
+User Documentation
+   Using parsley
+       At first, install parsley. Either use an installation package which fits to your system or
+       download the source package, unpack it to somewhere and install all the requirements mentioned
+       in the Dependencies.
+
+       Once you have installed parsley, two executables are available:
+
+       · parsley_gui: A very minimalist graphical tool which uses parsley just by mouse without doing
+	 any further configuration.
+
+       · parsley: The parsley application. It is a command line tool with some options, which parses
+	 a parsley configuration file and executes the syncs as defined there.
+
+       The former one is often added to the start menu of your operating system after installation.
+       However, it only fulfills very basic needs and is not recommended for productive use. Instead,
+       parsley should be called by a cronjob every 3 minutes or so. Add such a line to your crontab:
+
+       */3 * * * * /usr/lib/parsley/parsley.py --config /home/foo/.parsleycfg --sync ALL --datadir /home/foo/.parsleydata
+
+       This implies two things:
+
+       · Parsley can use /home/foo/.parsleydata for storing permanent runtime data. You should create
+	 this directory.
+
+       · Parsley uses /home/foo/.parsleycfg as configuration file. Create this file with this
+	 content:
+
+       syncs.append(
+	   InFsSync(
+	       LocalFilesystem(
+		   TrashRemove(),			    # leave files in a trash for some days instead
+							    # of hard removing
+		   path="/home/foo/mymusic",		    # local path
+		   name="my pc"),
+	       SshfsFilesystem(
+		   TrashRemove(),
+		   sshtarget="foo@fileserver",		    # ssh address of the remote side
+		   path="/mnt/raid/music",		    # path on the remote side
+		   idfile="/home/foo/.parsleysshloginkey",  # ssh identity file for authentication (must be
+							    # passwordless)
+		   name="file server"),
+	       DefaultSync(),				    # a normal sync
+	       Logging(logupdate=True, logcreate=True, logremove=True),
+	       name="music sync",
+	       interval=timedelta(hours=4)		    # synchronize every 4 hours
+       ))
+
+       logging.append(Logger(loggerout=FilestreamLoggerout(filename="/tmp/parsleylog"),
+			     formatter=PlaintextLogformat(),
+			     minseverity=Severity.DEBUGVERBOSE, maxseverity=Severity.ERROR))
+
+       This configures logging to a log file and one synchronization configuration.
+
+       For more sophisticated configurations, you currently have to take a look at parsley.sync.infs
+       in the developer documentation. I admit, this is rather technical :-/ If you want to override
+       some parts of the plain default behavior, see parsley.sync.infs.aspect.Aspect and
+       parsley.sync.infs.filesystem.Filesystem.
+
+

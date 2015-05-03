@@ -1,0 +1,119 @@
+name = 'parsley'
+version = '1.0'
+authors = ["Josef Hahn"]
+summary = 'a modular python-based file synchronization tool'
+email   = "parsley2015@ginger.ws"
+license = licensing.GPLv3
+keywords = "python filesystem synchronization"
+maturity = projectdata.Maturity.ProductionStable
+
+basecolor = (0.1, 0.7, 0.4)
+
+longdescription= '''
+Parsley keeps a configured set of places in file systems in sync on a regular basis.
+
+Those file systems can live on remote machines and become mounted
+by means of sshfs at runtime automatically.
+
+Features:
+
+- Keeps local and ssh file systems in sync
+- Has a mechanism for metadata synchronization (tags, rating, ...)
+- Robust infrastructure with working retry and error handling
+- Alternative modes
+ - move to sink mode: always moves all files from the source to a sink and so keep the source empty.
+- Flexible and extensible api
+'''
+
+versioncontrol.svn.is_svn_controlled()
+
+documentation.has_doxygen_developerdocumentation()
+readme_pdf_include_developer_doc = True
+
+makehomepage = homepage.tasks.makehomepage
+releasing.releasetasks.add(sshfiletransfer.tasks.upload, source=TaskExecution(makehomepage))
+
+datainjections.pool.add(datainjections.tasks.inject_python, outfile="parsley/runtime/projectinformations.py",
+                   do_in_source=True)
+
+distributables.pool.addgroup(packages.tasks.tarpackage, name="source tarball", linkto="../parsley.tgz")
+
+distributables.pool.addgroup(packages.debian.tasks.debpackage, name="Debian/Ubuntu package",
+                   executablelinks={"parsley": "/usr/lib/parsley/parsley.py", "parsley_gui": "/usr/lib/parsley/parsley_gui.py"},
+                   menuentries = [packages.debian.MenuEntry(name="parsley",
+                                                            title="parsley",
+                                                            category=packages.debian.Category.ApplicationsSystem,
+                                                            command="parsley_gui",
+                                                            gui=True,
+                                                            icon="_meta/icon.png"),],
+                   source={"/usr/lib/{name}": TaskExecution(packages.debian.tasks.only_programfiles)})
+                   
+distributables.pool.addgroup(packages.python.tasks.wheelpackage, name="Python wheel package",
+                   applicationlinks=[packages.python.WheelApplicationLink(linkname="parsley", module="parsley.engine", method="main", gui=False),
+                                     packages.python.WheelApplicationLink(linkname="parsley_gui", module="parsley.gui.main", method="main", gui=True)])
+
+distributables.pool.addgroup(packages.win32.tasks.win32exepackage, name="Windows package",
+                   menuentries = [packages.win32.MenuEntry(title="parsley (window mode)",
+                                                           command="$$/parsley_gui.py")],
+                             oninitscript="""
+                                !insertmacro RequirePython "3"
+                                IfFileExists "$PYPATH\\tcl\\*.*" TclExists NotTclExists
+                                NotTclExists:
+                                    MessageBox MB_OK "Your 'Python' is missing 'tk'. Please install the latest Python3 version as x86 variant (incl. 'tk' feature)."
+                                    Quit
+                                TclExists:
+                                """)
+
+imagegalleries.pool.add("Screenshots", "_meta/screenshots")
+
+dependencies.pool.add(dependencies.python.PythonDependency(dependencies.Type.Required, "3.4"))
+
+dependencies.pool.add(dependencies.Dependency(dependencies.Type.Recommended_HasAlternatives, "python-tk", "", "python", debian=["python3-tk"]))
+
+dependencies.pool.add(dependencies.Dependency(dependencies.Type.Recommended_HasAlternatives, "Typical Linux Desktop", "", "linux"))
+
+dependencies.pool.add(dependencies.Dependency(dependencies.Type.Optional, "sshfs", "", "ssh"))
+
+dependencies.pool.add(dependencies.Dependency(dependencies.Type.Optional, "python3-pyxattr", "", "package", debian=["python3-pyxattr"]))
+
+dependencies.pool.add(dependencies.Dependency(dependencies.Type.Included, "banner image", 
+    "_meta/homepage_bannerimage.png; license [CC BY-SA 3.0](http://creativecommons.org/licenses/by-sa/3.0); copied from [here](http://en.wikipedia.org/wiki/File:Petersilie_kraus.jpg).", 
+    "artwork"))
+
+
+# write HOOK documentations
+import os
+import re
+lst=[project.projectdir]
+ptrnaddhook=re.compile("\\s*machine\\.addhook\\(\\s*[^,]+\\s*,\\s*([^,]+)\\s*,\\s*([^,]+)\\s*,\\s*(.*)\\s*\\)")
+hhooks={}
+while len(lst)>0:
+    x = lst.pop()
+    for y in os.listdir(x):
+        fy = x + "/" + y
+        if os.path.isdir(fy): lst.append(fy)
+        elif fy[-3:]==".py":
+            with open(fy, "r") as f: c = f.readlines()
+            for l in c:
+                m = ptrnaddhook.match(l)
+                if m:
+                    hook = m.group(1)
+                    hook = hook[hook.rfind(".")+1:]
+                    index = int(m.group(2))
+                    fname = m.group(3)
+                    fname = "parsley.sync.infs.aspect." + y[:-3] + "." + fname[:fname.find("(")]
+                    if not hook in hhooks: hhooks[hook] = []
+                    hhooks[hook].append((index, fname))
+                elif l.find("machine.addhook")>-1:
+                    raise Exception("bad format: "+l)
+def _listhook(_hhooks, h, indent):
+    return "\n".join([(" "*indent)+"- "+x[1] for x in sorted((_hhooks[h] if (h in _hhooks) else [(0,"none")]))])
+for hk in ["onbeginsync", "onbeginupdatedir", "onlistdir", "onelectmaster",
+           "onmasterelected", "ontypeconflictmaster",
+           "ontypeconflictslave", "onupdatefile", "onupdatelink", "onremovefile",
+           "onremovelink", "onremovedir", "onendprocessfile", "onendprocesslink",
+           "onendupdatedir", "onendsync", "onlogcreate", "onlogremove",
+           "onlogupdate", "onlogproblem"]:
+    for indent in range(1,5):
+        documentation.pool.add("HOOK"+str(indent)+"_"+hk.upper(), _listhook(hhooks, hk, indent))
+

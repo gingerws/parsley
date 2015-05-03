@@ -1,0 +1,1 @@
+A minimalist graphical interface for the first steps.

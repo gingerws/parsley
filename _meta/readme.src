@@ -1,0 +1,58 @@
+# Using parsley
+
+At first, install parsley. Either use an installation package which fits to your system or download the source
+package, unpack it to somewhere and install all the requirements mentioned in the \ref _dependencies "Dependencies".
+
+Once you have installed parsley, two executables are available:
+
+- `parsley_gui`: A very minimalist graphical tool which uses parsley just by mouse without doing any further
+  configuration.
+
+- `parsley`: The parsley application. It is a command line tool with some options, which parses a parsley
+  configuration file and executes the syncs as defined there.
+
+The former one is often added to the start menu of your operating system after installation. However, it only
+fulfills very basic needs and is not recommended for productive use. Instead, `parsley` should be called by a cronjob
+every 3 minutes or so. Add such a line to your crontab:
+
+\verbatim
+*/3 * * * * /usr/lib/parsley/parsley.py --config /home/foo/.parsleycfg --sync ALL --datadir /home/foo/.parsleydata
+\endverbatim
+
+This implies two things:
+
+- Parsley can use `/home/foo/.parsleydata` for storing permanent runtime data. You should create this directory.
+
+- Parsley uses `/home/foo/.parsleycfg` as configuration file. Create this file with this content:
+
+\verbatim
+syncs.append(
+    InFsSync(
+        LocalFilesystem(
+            TrashRemove(),                           # leave files in a trash for some days instead
+                                                     # of hard removing
+            path="/home/foo/mymusic",                # local path
+            name="my pc"),
+        SshfsFilesystem(
+            TrashRemove(),
+            sshtarget="foo@fileserver",              # ssh address of the remote side
+            path="/mnt/raid/music",                  # path on the remote side
+            idfile="/home/foo/.parsleysshloginkey",  # ssh identity file for authentication (must be
+                                                     # passwordless)
+            name="file server"),
+        DefaultSync(),                               # a normal sync
+        Logging(logupdate=True, logcreate=True, logremove=True),
+        name="music sync",
+        interval=timedelta(hours=4)                  # synchronize every 4 hours
+))
+
+logging.append(Logger(loggerout=FilestreamLoggerout(filename="/tmp/parsleylog"),
+                      formatter=PlaintextLogformat(),
+                      minseverity=Severity.DEBUGVERBOSE, maxseverity=Severity.ERROR))
+\endverbatim
+
+This configures logging to a log file and one synchronization configuration.
+
+For more sophisticated configurations, you currently have to take a look at parsley.sync.infs in the developer
+documentation. I admit, this is rather technical :-/ If you want to override some parts of the plain default behavior,
+see parsley.sync.infs.aspect.Aspect and parsley.sync.infs.filesystem.Filesystem.
